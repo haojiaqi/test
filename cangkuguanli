@@ -1,0 +1,673 @@
+import javax.servlet.http.HttpServletRequest;
+
+import javax.servlet.http.HttpServletResponse;
+
+import javax.servlet.http.HttpSession;
+
+ 
+
+import org.apache.struts.action.Action;
+
+import org.apache.struts.action.ActionForm;
+
+import org.apache.struts.action.ActionForward;
+
+import org.apache.struts.action.ActionMapping;
+
+import com.javateam3.struts.form.LoginForm;
+
+ 
+
+import com.javateam3.whmsys.common.dao.LoginService;
+
+ 
+
+/** 
+
+ * MyEclipse Struts
+
+ * Creation date: 05-30-2009
+
+ * 
+
+ * XDoclet definition:
+
+ * @struts.action path="/login" name="loginForm" input="/webpage/login.jsp" scope="request" validate="true"
+
+ */
+
+public class LoginAction extends Action {
+
+ 
+
+public ActionForward execute(ActionMapping mapping, ActionForm form,
+
+HttpServletRequest request, HttpServletResponse response) {
+
+LoginForm loginForm = (LoginForm) form;
+
+try{
+
+      String userName=loginForm.getUser_name().trim();
+
+   String psw=loginForm.getPsw().trim();
+
+    LoginService loginService=new LoginService();
+
+      HttpSession session = request.getSession(true);
+
+      if(loginService.login(userName, psw)){
+
+          session.setAttribute("username",userName);
+
+             //如果登录成功把登录的名字放在session中以便在过滤器中判断           
+
+      return  mapping.findForward("loginSuccess");
+
+     //返回到登陆成功页面
+
+      }else{
+
+         session.invalidate();
+
+         request.setAttribute("loginError", "用户或者密码错误!!");
+
+        //返回到错误页面
+
+        return mapping.findForward("loginError");
+
+      }
+
+    }catch(Exception e){
+
+     e.printStackTrace();
+
+    }
+
+return null;
+
+}
+
+}
+
+登陆过滤器
+import java.io.IOException;
+
+import javax.servlet.Filter;
+
+import javax.servlet.FilterChain;
+
+import javax.servlet.FilterConfig;
+
+import javax.servlet.ServletException;
+
+import javax.servlet.ServletRequest;
+
+import javax.servlet.ServletResponse;
+
+import javax.servlet.http.*;
+
+public class SecurityAndDeny implements Filter {
+
+  public void destroy() {
+
+//注销时调用
+
+}
+
+    public void doFilter(ServletRequest req, ServletResponse resp,
+
+            FilterChain chain) throws IOException, ServletException {
+
+            HttpServletRequest request = (HttpServletRequest)req; 
+
+        HttpServletResponse response=(HttpServletResponse)resp;       
+
+        HttpSession session = request.getSession(false); 
+
+//取出来session如果没有得到空值
+
+        if (session== null||session.getAttribute("username")== null) {
+
+                    //判断是否登录过如果没有就重定向到登陆页面                 
+
+                   String temp="你还没登陆请重新登陆！！";
+
+                    temp=java.net.URLEncoder.encode(temp.toString(),"utf-8")； response.sendRedirect("http://localhost:8080/JT03EtpLgtWebProject03/login.jsp?loginErr="+temp); 
+
+                  return;
+
+                                   }
+
+          //如果登录了就进入请求页面
+
+        chain.doFilter(req, resp);
+
+    }
+
+public void init(FilterConfig arg0) throws ServletException {
+
+//初始化时调用的方法
+
+}
+
+}
+
+登陆DAO
+public Boolean login(String userName,String psw)
+
+  {
+
+  Employee employee=new Employee();
+
+  employee.setPsw(psw) ;
+
+  employee.setUserName(userName);
+
+ List results=findByExample(employee);
+
+   int length=results.size();
+
+   if(length==1)
+
+   {
+
+   return true;
+
+   }
+
+   else
+
+   {
+
+   return false;
+
+   } 
+
+  }
+
+ 
+供货商查询Action
+package com.javateam3.whmsys.manager.basicinfo.supplyerinfo.action;
+
+ 
+
+import java.util.List;
+
+ 
+
+import javax.servlet.http.HttpServletRequest;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.struts.action.Action;
+
+import org.apache.struts.action.ActionForm;
+
+import org.apache.struts.action.ActionForward;
+
+import org.apache.struts.action.ActionMapping;
+
+ 
+
+import com.javateam3.whmsys.common.PageBean;
+
+ 
+
+import com.javateam3.whmsys.manager.basicinfo.supplyerinfo.form.QueryForm;
+
+import com.javateam3.whmsys.manager.basicinfo.supplyerinfo.service.SupplierService;
+
+import com.javateam3.whmsys.common.pojo.Supplier;
+
+import com.javateam3.whmsys.common.utils.Tool;
+
+ 
+
+public class QueryAction extends Action {
+
+ 
+
+public ActionForward execute(ActionMapping mapping, ActionForm form,
+
+HttpServletRequest request, HttpServletResponse response)
+
+throws Exception {
+
+QueryForm queryForm = (QueryForm) form;
+
+SupplierService ss = new SupplierService();
+
+PageBean pageBean = new PageBean();
+
+List list = null;
+
+//存放查出来的spplier对象
+
+String crrPage = request.getParameter("cp");
+
+int currentPage = pageBean.getCurrentPage();
+
+int lineSize = pageBean.getLineSize();
+
+Supplier supplier = change(queryForm);
+
+if (crrPage != null) {
+
+currentPage = Integer.parseInt(crrPage);
+
+} else {
+
+int allRecorders = ss.getCount(supplier);
+
+Tool.setALLRECORDERS(allRecorders);
+
+Tool.setPAGESIZE((allRecorders + lineSize - 1) / lineSize);
+
+pageBean.setAllRecorders(allRecorders);
+
+ 
+
+pageBean.setPageSize((allRecorders + lineSize - 1) / lineSize);
+
+}
+
+list = ss.queryByExample(supplier, currentPage, lineSize);
+
+pageBean.setCurrentPage(currentPage);
+
+request.setAttribute("pageBean", pageBean);
+
+request.setAttribute("list", list);
+
+       //把查询出来的supplier对象放在request里
+
+return mapping.findForward("supplierResult");
+
+}
+
+        //把form表单里的东西转化为supplier对象
+
+public Supplier change(QueryForm queryForm) {
+
+Supplier supplier = new Supplier();
+
+if (queryForm.getSupplierId() != null
+
+&& !queryForm.getSupplierId().equals(""))
+
+supplier.setSupplierId(queryForm.getSupplierId());
+
+if (queryForm.getAddress() != null
+
+&& !queryForm.getAddress().equals(""))
+
+supplier.setAddress(queryForm.getAddress());
+
+if (queryForm.getName() != null && !queryForm.getName().equals(""))
+
+supplier.setName(queryForm.getName());
+
+if (queryForm.getCredit() != null && !queryForm.getCredit().equals(""))
+
+supplier.setCredit(queryForm.getCredit());
+
+if (queryForm.getPhone() != null && !queryForm.getPhone().equals(""))
+
+supplier.setPhone(queryForm.getPhone());
+
+if (queryForm.getRemark() != null && !queryForm.getRemark().equals(""))
+
+supplier.setRemark(queryForm.getRemark());
+
+return supplier;
+
+}
+
+}
+
+供货商修改Action
+import javax.servlet.http.HttpServletRequest;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.struts.action.Action;
+
+import org.apache.struts.action.ActionForm;
+
+import org.apache.struts.action.ActionForward;
+
+import org.apache.struts.action.ActionMapping;
+
+ 
+
+import com.javateam3.whmsys.common.pojo.Supplier;
+
+import com.javateam3.whmsys.manager.basicinfo.supplyerinfo.form.ModifyForm;
+
+import com.javateam3.whmsys.manager.basicinfo.supplyerinfo.service.SupplierService;
+
+public class ModifyAction extends Action {
+
+public ActionForward execute(ActionMapping mapping, ActionForm form,
+
+HttpServletRequest request, HttpServletResponse response) {
+
+ModifyForm modifyForm = (ModifyForm) form;
+
+Supplier supplier = new Supplier();
+
+supplier.setAddress(modifyForm.getAddress());
+
+supplier.setCredit(modifyForm.getCredit());
+
+supplier.setName(modifyForm.getName());
+
+supplier.setPhone(modifyForm.getPhone());
+
+supplier.setRemark(modifyForm.getRemark());
+
+supplier.setSupplierId(modifyForm.getSupplierId());
+
+SupplierService ss = new SupplierService();
+
+try {
+
+ss.upDate(supplier);
+
+return mapping.findForward("success");
+
+} catch (Exception e) {
+
+e.printStackTrace();
+
+return mapping.findForward("error");
+
+}
+
+}
+
+}供货商添加Action
+
+import javax.servlet.http.HttpServletRequest;
+
+import javax.servlet.http.HttpServletResponse;
+
+import org.apache.struts.action.Action;
+
+import org.apache.struts.action.ActionForm;
+
+import org.apache.struts.action.ActionForward;
+
+import org.apache.struts.action.ActionMapping;
+
+ 
+
+import com.javateam3.whmsys.common.pojo.Supplier;
+
+import com.javateam3.whmsys.manager.basicinfo.supplyerinfo.form.AddForm;
+
+import com.javateam3.whmsys.manager.basicinfo.supplyerinfo.service.SupplierService;
+
+public class AddAction extends Action {
+
+public ActionForward execute(ActionMapping mapping, ActionForm form,
+
+HttpServletRequest request, HttpServletResponse response) {
+
+AddForm addForm = (AddForm) form;
+
+Supplier supplier = new Supplier();
+
+supplier.setAddress(addForm.getAddress());
+
+supplier.setCredit(addForm.getCredit());
+
+supplier.setName(addForm.getName());
+
+supplier.setPhone(addForm.getPhone());
+
+supplier.setRemark(addForm.getRemark());
+
+supplier.setSupplierId(addForm.getSupplierId());
+
+ 
+
+SupplierService ss = new SupplierService();
+
+try {
+
+ss.insert(supplier);
+
+return mapping.findForward("success");
+
+} catch (Exception e) {
+
+e.printStackTrace();
+
+             //出现异常打印轨迹
+
+return mapping.findForward("error");
+
+}
+
+ 
+
+}
+
+}
+
+供货商DAO
+package com.javateam3.whmsys.manager.basicinfo.supplyerinfo.dao;
+
+import java.util.ArrayList;
+
+import java.util.List;
+
+import org.hibernate.Criteria;
+
+import org.hibernate.LockMode;
+
+import org.hibernate.Query;
+
+import org.hibernate.Session;
+
+import org.hibernate.Transaction;
+
+import org.hibernate.criterion.Example;
+
+ 
+
+import com.javateam3.whmsys.common.dao.BaseHibernateDAO;
+
+import com.javateam3.whmsys.common.pojo.Supplier;
+
+import com.javateam3.whmsys.common.utils.UtilGetExample;
+
+public class SupplierDAO extends BaseHibernateDAO {
+
+public static final String NAME = "name";
+
+public static final String ADDRESS = "address";
+
+public static final String PHONE = "phone";
+
+public static final String CREDIT = "credit";
+
+public static final String REMARK = "remark";
+
+public static final String SUPPLIERID="supplierId";
+
+public void save(Supplier transientInstance) {
+
+Transaction transaction=null;
+
+try { 
+
+Session session= getSession();
+
+transaction=session.beginTransaction();
+
+session.save(transientInstance);
+
+transaction.commit();
+
+session.close();
+
+} catch (Exception re) {
+
+}
+
+}
+
+public void upDate(Supplier transientInstance)throws Exception {
+
+try {
+
+Session session= getSession();
+
+Transaction transaction = session.beginTransaction();
+
+session.update(transientInstance);
+
+ 
+
+transaction.commit();
+
+session.close();
+
+} catch (RuntimeException re) {
+
+throw re;
+
+}
+
+}
+
+ 
+
+public Supplier findById(java.lang.String id) {
+
+try {
+
+Session session= getSession();
+
+Transaction transaction = session.beginTransaction();
+
+Supplier instance = (Supplier) session.get(
+
+"com.javateam3.whmsys.common.pojo.Supplier", id);
+
+session.close();
+
+return instance;
+
+} catch (RuntimeException re) {
+
+throw re;
+
+}
+
+}
+
+public int getCount(Supplier instance) throws Exception {
+
+if(instance.getSupplierId()!=null)
+
+{
+
+  Supplier supplier=findById(instance.getSupplierId());
+
+  if(supplier!=null)
+
+  {
+
+  return 1;
+
+  }
+
+  else{
+
+  return 0;
+
+  }
+
+}
+
+else{
+
+Session session= getSession();
+
+Transaction transaction = session.beginTransaction();
+
+Criteria c = session.createCriteria(
+
+"com.javateam3.whmsys.common.pojo.Supplier").add(
+
+Example.create(instance));
+
+ 
+
+int i=c.list().size();
+
+transaction.commit();
+
+session.close();
+
+return i;}
+
+}
+
+public List findByExample(Supplier instance, int currentPage, int lineSize)
+
+throws Exception {
+
+List list = null;
+
+Session session=getSession();
+
+if(findByProperty(SUPPLIERID,  instance.getSupplierId()).size()==0||findByProperty("supplierId",  instance.getSupplierId())==null)
+
+{
+
+Example es=UtilGetExample.getExample(instance);
+
+Transaction transaction = session.beginTransaction();
+
+Criteria c = session.createCriteria(
+
+"com.javateam3.whmsys.common.pojo.Supplier")
+
+.add(es);
+
+c.setFirstResult((currentPage - 1) * lineSize);
+
+c.setMaxResults(lineSize);
+
+list = c.list();
+
+transaction.commit();
+
+getSession().close();
+
+if(list.size()==0||list==null)
+
+{
+
+return null;
+
+}
+
+return list;
+
+}
+
+else
+
+{
+
+return findByProperty("supplierId",  instance.getSupplierId());
+
+}
+
+}
